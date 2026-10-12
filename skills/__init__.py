@@ -1,0 +1,1 @@
+"""BLUE skills module."""
