@@ -10,8 +10,7 @@ Before starting a task, read:
 - `AGENTS.md`
 - `PROJECT_STATUS.md`, if it exists
 - `ARCHITECTURE.md`, if it exists
-- `MODULE_CONTRACTS.md`, if it exists
-- `TASK_BOARD.md`, if it exists
+- `AI_WORKFLOW.md`
 - Relevant module documentation and tests
 
 Do not assume that files listed in future plans already exist.
