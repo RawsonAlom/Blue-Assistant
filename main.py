@@ -1,11 +1,15 @@
 """Terminal text-chat entry point for BLUE."""
 
 import asyncio
+import os
+import sqlite3
 import sys
 from collections.abc import Callable
+from pathlib import Path
 
 from contracts.messages import UserMessage
 from core.brain import Brain
+from core.coordinator import Coordinator
 from core.runtime import create_brain
 from integrations.provider import (
     ProviderError,
@@ -13,19 +17,35 @@ from integrations.provider import (
     ProviderTimeoutError,
     ProviderUnavailableError,
 )
+from memory.store import MemoryStore
 
 InputFunction = Callable[[str], str]
 OutputFunction = Callable[[str], None]
+
+
+def default_memory_path() -> Path:
+    """Return a persistent database path outside the project repository."""
+
+    configured_home = os.environ.get("XDG_DATA_HOME")
+    data_home = (
+        Path(configured_home).expanduser()
+        if configured_home
+        else Path.home() / ".local" / "share"
+    )
+    return data_home / "blue" / "blue.sqlite3"
 
 
 async def run_chat(
     brain: Brain,
     input_fn: InputFunction = input,
     output_fn: OutputFunction = print,
+    memory_store: MemoryStore | None = None,
 ) -> None:
-    """Run a text conversation with injectable input and output."""
+    """Run terminal chat with optional persistent conversation history."""
 
+    coordinator = Coordinator(brain, memory_store=memory_store)
     session_id = "terminal-session"
+
     output_fn("BLUE text chat. Type 'exit' or 'quit' to stop.")
 
     while True:
@@ -49,39 +69,31 @@ async def run_chat(
         )
 
         try:
-            response = await brain.respond(message, context={})
+            response = await coordinator.handle(message)
         except ProviderRateLimitError:
-            output_fn(
-                "BLUE: Provider usage limit reached. "
-                "Check availability before trying again."
-            )
+            output_fn("BLUE: Provider usage limit reached.")
         except ProviderTimeoutError:
             output_fn("BLUE: The AI request timed out.")
         except ProviderUnavailableError:
-            output_fn(
-                "BLUE: The AI service is temporarily unavailable. "
-                "No action was executed."
-            )
+            output_fn("BLUE: The AI service is temporarily unavailable.")
         except ProviderError:
-            output_fn(
-                "BLUE: The AI request failed. Check configuration "
-                "and try again later."
-            )
+            output_fn("BLUE: The AI request failed. Check configuration.")
         else:
             output_fn(f"BLUE: {response.text}")
 
 
 def main() -> int:
-    """Create the configured Brain and start the chat."""
+    """Create the configured Brain and start the text chat."""
 
     try:
         brain = create_brain()
-    except RuntimeError as exc:
-        print(f"Configuration error: {exc}", file=sys.stderr)
+        memory_store = MemoryStore(default_memory_path())
+    except (RuntimeError, OSError, sqlite3.Error) as exc:
+        print(f"Startup error: {exc}", file=sys.stderr)
         return 2
 
     try:
-        asyncio.run(run_chat(brain))
+        asyncio.run(run_chat(brain, memory_store=memory_store))
     except KeyboardInterrupt:
         print("\nBLUE: Session ended.")
 

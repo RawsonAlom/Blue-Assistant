@@ -8,6 +8,7 @@ from integrations.provider import (
     ProviderUnavailableError,
 )
 from main import run_chat
+from memory.store import MemoryStore
 
 
 class FakeBrain:
@@ -119,3 +120,25 @@ def test_text_chat_handles_end_of_input() -> None:
 
     assert brain.messages == []
     assert any("BLUE: Session ended." in line for line in output)
+
+
+def test_text_chat_persists_conversation(tmp_path) -> None:
+    store = MemoryStore(tmp_path / "chat-history.sqlite3")
+    brain = FakeBrain()
+    output: list[str] = []
+
+    asyncio.run(
+        run_chat(
+            brain,
+            input_fn=make_input(["Hello BLUE", "exit"]),
+            output_fn=output.append,
+            memory_store=store,
+        )
+    )
+
+    history = store.get_history("terminal-session")
+
+    assert [(item.role, item.content) for item in history] == [
+        ("user", "Hello BLUE"),
+        ("assistant", "Echo: Hello BLUE"),
+    ]
