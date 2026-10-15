@@ -4,6 +4,11 @@ dev = [
     "ruff>=0.14,<1",
 ]
 
+runtime = [
+    "python-dotenv>=1.0,<2",
+    "openrouter>=1,<2",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
